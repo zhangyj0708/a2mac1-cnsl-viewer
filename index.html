@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2MAC1 CNSL 尺寸爬取与分析平台</title>
+<link rel="stylesheet" href="css/style.css">
+  <!-- Three.js 3D 引擎（CDN 加载，公网部署） -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <!-- JSZip: 浏览器端解压 .zip（CDN 加载） -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+
+<!-- ════════════════ 顶部导航 ════════════════ -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="icon">📐</span>
+    <span>CNSL 分析平台</span>
+  </div>
+  <ul class="navbar-nav">
+    <li><a href="#search" data-page="search" class="active">🔍 车型搜索</a></li>
+    <li><a href="#database" data-page="database">🗄️ 数据库</a></li>
+    <li><a href="#viewer3d" data-page="viewer3d">🔮 3D 查看器</a></li>
+    <li><a href="#tools" data-page="tools">🛠️ 工具</a></li>
+    <li><a href="#about" data-page="about">ℹ️ 关于</a></li>
+  </ul>
+  <div class="navbar-actions">
+    <span id="db-status" class="badge badge-warning" style="font-size:11px">空数据库</span>
+  </div>
+</nav>
+
+<!-- ════════════════ 页面1: 车型搜索 ════════════════ -->
+<div id="page-search" class="page active">
+  <div class="search-hero">
+    <h1>A2MAC1 Console 尺寸数据</h1>
+    <p>从 A2MAC1 提取 → 导入 → 一键对标分析</p>
+    <div class="search-box">
+      <input type="text" class="input" id="search-input"
+             placeholder="输入品牌或车型名称搜索..."
+             autocomplete="off">
+      <button class="btn btn-primary" id="search-btn">搜索</button>
+    </div>
+  </div>
+
+  <!-- 搜索结果 -->
+  <div id="search-results" class="results-grid" style="display:none"></div>
+
+  <!-- 空状态：提示导入 -->
+  <div id="search-empty" class="empty-state" style="display:none">
+    <div class="icon">📥</div>
+    <p style="font-size:16px;margin-bottom:8px">还没有数据</p>
+    <p style="color:var(--text-secondary);margin-bottom:20px">从 A2MAC1 提取数据后导入</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btn-import-from-empty" style="font-size:14px;padding:10px 24px">
+        📥 导入 A2MAC1 JSON
+      </button>
+      <button class="btn" id="btn-copy-console-from-empty" style="font-size:14px;padding:10px 24px">
+        📋 复制提取脚本
+      </button>
+    </div>
+    <p style="color:var(--text-secondary);font-size:12px;margin-top:16px">
+      ① 在 A2MAC1 页面 F12 → Console → 粘贴脚本运行<br>
+      ② 运行 __CNSL_exportJSON() 下载 JSON<br>
+      ③ 回到这里 → 导入 JSON → 完成
+    </p>
+  </div>
+
+  <!-- 车型详情 -->
+  <div id="vehicle-detail" style="display:none">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span id="detail-title">车型详情</span>
+        <div>
+          <button class="btn btn-sm" id="btn-refresh-data">🔄 刷新数据</button>
+          <button class="btn btn-sm btn-danger" id="btn-delete-vehicle">🗑️ 删除</button>
+        </div>
+      </div>
+      <div class="detail-grid" id="detail-info"></div>
+    </div>
+
+    <!-- Console 尺寸 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span>📏 Console 尺寸数据</span>
+        <button class="btn btn-sm btn-primary" id="btn-add-console">+ 添加 Console</button>
+      </div>
+      <div class="table-wrap">
+        <table id="console-table">
+          <thead>
+            <tr>
+              <th>名称</th><th>A (长)</th><th>B (宽)</th><th>C (高)</th>
+              <th>A min</th><th>B min</th><th>C min</th>
+              <th>材质</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="console-empty" class="empty-state" style="display:none">
+        <div class="icon">📭</div>
+        <p>暂无 Console 尺寸数据</p>
+      </div>
+    </div>
+
+    <!-- 3D 文件 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span>📦 3D 点云文件</span>
+        <div>
+          <span id="file-count" style="font-size:12px;color:var(--text-secondary);margin-right:8px"></span>
+          <button class="btn btn-sm" id="btn-select-all">全选</button>
+          <button class="btn btn-sm btn-primary" id="btn-download-selected">下载选中</button>
+        </div>
+      </div>
+      <div class="file-list" id="file-list"></div>
+      <div id="file-empty" class="empty-state" style="display:none">
+        <div class="icon">📦</div>
+        <p>暂无 3D 文件</p>
+      </div>
+    </div>
+
+    <!-- 桥洞 -->
+    <div class="card">
+      <div class="card-header">
+        <span>🕳️ 桥洞参数</span>
+        <button class="btn btn-sm btn-primary" id="btn-add-bridge">+ 添加桥洞</button>
+      </div>
+      <div class="table-wrap">
+        <table id="bridge-table">
+          <thead>
+            <tr>
+              <th>名称</th><th>底宽</th><th>顶宽</th><th>深度</th>
+              <th>截面积</th><th>容积</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="bridge-empty" class="empty-state" style="display:none">
+        <div class="icon">🕳️</div>
+        <p>暂无桥洞数据</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ 页面2: 数据库 ════════════════ -->
+<div id="page-database" class="page">
+  <div class="page-title">🗄️ 数据库概览</div>
+
+  <div class="stats-row" id="db-stats"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <span>已存储车型</span>
+      <div>
+        <button class="btn btn-sm" id="btn-export-db">📤 导出数据库</button>
+        <button class="btn btn-sm btn-primary" id="btn-import-db">📥 导入 A2MAC1 JSON</button>
+        <button class="btn btn-sm btn-danger" id="btn-clear-db">🗑️ 清空数据库</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="db-vehicle-table">
+        <thead>
+          <tr>
+            <th>品牌</th><th>车型</th><th>年份</th><th>Console 数</th>
+            <th>文件数</th><th>添加时间</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="db-empty" class="empty-state" style="display:none">
+      <div class="icon">🗄️</div>
+      <p>数据库为空</p>
+      <button class="btn btn-primary" id="btn-import-from-db-empty" style="margin-top:12px">📥 导入 A2MAC1 JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ 页面3: 工具 ════════════════ -->
+<div id="page-tools" class="page">
+  <div class="page-title">🛠️ 工具</div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header">📋 A2MAC1 浏览器提取脚本</div>
+    <p style="color:var(--text-secondary);margin-bottom:12px">
+      在 A2MAC1 页面的浏览器控制台（F12）中运行此脚本，自动提取车型数据、尺寸和文件下载链接。
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btn-copy-console">📋 复制 Console 脚本</button>
+      <button class="btn" id="btn-copy-bookmarklet">🔖 复制书签小工具</button>
+      <a href="scripts/a2mac1-extractor.user.js" class="btn" download>📥 下载 Tampermonkey 脚本</a>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-secondary);border-radius:8px;font-size:13px;color:var(--text-secondary);line-height:1.8">
+      <strong style="color:var(--text-primary)">使用步骤：</strong><br>
+      ① 打开 A2MAC1 → 进入目标车型的 <strong>3D Data v3</strong> 页面<br>
+      ② 按 <strong>F12</strong> → 切换到 <strong>Console</strong> 标签<br>
+      ③ 粘贴脚本 → 回车运行<br>
+      ④ 运行 <code style="background:#e2e8f0;padding:1px 4px;border-radius:3px">__CNSL_exportJSON()</code> 下载 JSON<br>
+      ⑤ 回到本平台 → 数据库 → 导入 JSON
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">🤖 AI 适配判定</div>
+    <p style="color:var(--text-secondary);margin-bottom:12px">
+      输入部件尺寸，判断是否能放入指定车型的 Console 桥洞中。
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;color:var(--text-secondary)">部件长 (mm)</label>
+        <input class="input" id="fit-l" type="number" step="0.1" placeholder="140"></div>
+      <div><label style="font-size:12px;color:var(--text-secondary)">部件宽 (mm)</label>
+        <input class="input" id="fit-w" type="number" step="0.1" placeholder="150"></div>
+      <div><label style="font-size:12px;color:var(--text-secondary)">部件高 (mm)</label>
+        <input class="input" id="fit-h" type="number" step="0.1" placeholder="100"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <select class="input" id="fit-vehicle" style="width:auto;flex:1">
+        <option value="">-- 选择目标车型 --</option>
+      </select>
+      <button class="btn btn-primary" id="btn-fit-check">判定适配</button>
+    </div>
+    <div id="fit-result" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ════════════════ 页面4: 3D 查看器 ════════════════ -->
+<div id="page-viewer3d" class="page">
+  <div class="viewer3d-layout">
+    <!-- 左侧工具栏 -->
+    <div class="viewer3d-sidebar">
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">📂 加载文件</div>
+        <div class="viewer3d-dropzone" id="viewer3d-dropzone">
+          <div class="icon">📦</div>
+          <p>拖放 .ply / .stl / .obj / .zip 文件</p>
+          <p style="font-size:11px;color:var(--text-secondary)">或点击选择</p>
+          <input type="file" id="viewer3d-file-input" accept=".ply,.stl,.obj,.zip" style="display:none" multiple>
+        </div>
+        <div id="viewer3d-file-list" style="margin-top:8px;font-size:12px;max-height:120px;overflow-y:auto"></div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">🎨 显示模式</div>
+        <div class="viewer3d-btn-group" id="viewer3d-mode-group">
+          <button class="viewer3d-btn" data-mode="points">点云</button>
+          <button class="viewer3d-btn" data-mode="wireframe">线框</button>
+          <button class="viewer3d-btn active" data-mode="solid">实体</button>
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">🌈 着色</div>
+        <div class="viewer3d-btn-group" id="viewer3d-color-group">
+          <button class="viewer3d-btn active" data-color="solidColor">纯色</button>
+          <button class="viewer3d-btn" data-color="height">高度</button>
+          <button class="viewer3d-btn" data-color="normal">法向</button>
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">✏️ 边缘线</div>
+        <div class="viewer3d-btn-group" id="viewer3d-edges-group">
+          <button class="viewer3d-btn active" data-edges="on">显示</button>
+          <button class="viewer3d-btn" data-edges="off">隐藏</button>
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">🔍 相机控制</div>
+        <div class="viewer3d-btn-group">
+          <button class="viewer3d-btn" id="viewer3d-zoom-in" title="相机靠近">➕ 拉近</button>
+          <button class="viewer3d-btn" id="viewer3d-zoom-out" title="相机远离">➖ 拉远</button>
+          <button class="viewer3d-btn" id="viewer3d-zoom-fit" title="自动适配窗口">📐 适配</button>
+        </div>
+        <div class="viewer3d-btn-group" style="margin-top:4px">
+          <button class="viewer3d-btn" id="viewer3d-auto-rotate" title="自动旋转模型">🔄 自动旋转</button>
+        </div>
+      </div>
+
+      <!-- 模型缩放已移除：使用相机缩放（➕➖）替代，避免网格/模型比例失调 -->
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">👁️ 预设视角</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">
+          <button class="viewer3d-btn" data-view="front">正面</button>
+          <button class="viewer3d-btn" data-view="back">背面</button>
+          <button class="viewer3d-btn" data-view="left">左侧</button>
+          <button class="viewer3d-btn" data-view="right">右侧</button>
+          <button class="viewer3d-btn" data-view="top">顶部</button>
+          <button class="viewer3d-btn" data-view="bottom">底部</button>
+          <button class="viewer3d-btn" data-view="iso" style="grid-column:span 2">等轴测</button>
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">🌓 背景</div>
+        <div class="viewer3d-btn-group" id="viewer3d-bg-group">
+          <button class="viewer3d-btn" data-bg="dark">深色</button>
+          <button class="viewer3d-btn active" data-bg="light">浅色</button>
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">📏 测量</div>
+        <button class="btn btn-sm" id="viewer3d-measure-btn" style="width:100%">📏 点击两点测距</button>
+        <div id="viewer3d-measure-result" style="font-size:12px;margin-top:4px;color:var(--text-secondary)"></div>
+      </div>
+
+      <div class="viewer3d-section">
+        <div class="viewer3d-section-title">📊 模型信息</div>
+        <div id="viewer3d-info" style="font-size:12px;color:var(--text-secondary);line-height:1.8">
+          未加载模型
+        </div>
+      </div>
+
+      <div class="viewer3d-section">
+        <button class="btn btn-sm" id="viewer3d-reset-camera" style="width:100%">🔄 重置视角</button>
+      </div>
+    </div>
+
+    <!-- 右侧 3D 画布 -->
+    <div class="viewer3d-canvas-wrap" id="viewer3d-container">
+      <div class="viewer3d-hint" id="viewer3d-hint">
+        <div class="icon">🔮</div>
+        <p>拖放文件到此处或左侧区域开始查看</p>
+        <p style="font-size:12px;color:var(--text-secondary)">支持 .ply / .stl / .obj / .zip</p>
+        <p style="font-size:11px;color:var(--text-secondary);margin-top:8px">
+          🖱️ 左键旋转 · 滚轮缩放 · 右键平移
+        </p>
+      </div>
+      <canvas id="viewer3d-canvas"></canvas>
+
+      <!-- 浮动控制栏：画布底部 -->
+      <div class="viewer3d-floatbar" id="viewer3d-floatbar" style="display:none">
+        <button class="viewer3d-fbtn" id="v3d-fbtn-reset" title="找回模型并适配窗口" style="font-weight:700;color:#60a5fa">🔍 找回</button>
+        <span class="viewer3d-fsep">|</span>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-zoomin" title="放大">➕</button>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-zoomout" title="缩小">➖</button>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-fit" title="适配窗口">📐 适配</button>
+        <span class="viewer3d-fsep">|</span>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-front" title="正面">正面</button>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-top" title="俯视">俯视</button>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-left" title="左侧">左侧</button>
+        <button class="viewer3d-fbtn" id="v3d-fbtn-iso" title="3D视角">3D</button>
+      </div>
+
+      <!-- 鼠标操作提示：画布左上角 -->
+      <div class="viewer3d-mouse-hint" id="viewer3d-mouse-hint" style="display:none">
+        🖱️ 左键旋转 &nbsp;|&nbsp; 滚轮缩放 &nbsp;|&nbsp; 右键平移
+      </div>
+
+          </div>
+  </div>
+</div>
+
+<!-- ════════════════ 页面5: 关于 ════════════════ -->
+<div id="page-about" class="page">
+  <div class="page-title">ℹ️ 关于</div>
+  <div class="card">
+    <h3 style="margin-bottom:12px">A2MAC1 CNSL 尺寸爬取与分析平台</h3>
+    <p style="color:var(--text-secondary);margin-bottom:8px">版本: 0.6.9</p>
+    <p style="color:var(--text-secondary);margin-bottom:16px">
+      从 A2MAC1 平台自动提取汽车 Console（中控台）的尺寸数据和 3D 点云文件，
+      支持多车型对标分析和部件适配判定。
+    </p>
+
+    <h4 style="margin-bottom:8px">API 参考</h4>
+    <p style="color:var(--text-secondary);margin-bottom:16px;font-size:13px">
+      API 逆向分析参考了 <code>opencli-plugin-a2mac1</code>（Node.js CLI 插件），
+      吸收了 VOP 层级树节点 ID、POST 尺寸数据 API 等关键信息。
+      详见 <code>data/vop-nodes.json</code>。
+    </p>
+
+    <h4 style="margin-bottom:8px">工作流程</h4>
+    <table>
+      <thead><tr><th>步骤</th><th>操作</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>在 A2MAC1 打开目标车型 3D Data v3 页面</td><td>需登录</td></tr>
+        <tr><td>2</td><td>F12 → Console → 粘贴提取脚本</td><td>自动提取所有数据</td></tr>
+        <tr><td>3</td><td>运行 __CNSL_exportJSON() 下载 JSON</td><td>包含车型+尺寸+文件链接</td></tr>
+        <tr><td>4</td><td>回到本平台 → 数据库 → 导入 JSON</td><td>自动填充所有数据</td></tr>
+        <tr><td>5</td><td>搜索车型、查看尺寸、对标分析</td><td>所有数据已就绪</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin:16px 0 8px">开发路线图</h4>
+    <table>
+      <thead><tr><th>阶段</th><th>内容</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>Phase 1-2</td><td>框架 + A2MAC1 自动提取</td><td>✅ 完成</td></tr>
+        <tr><td>Phase 3</td><td>3D 点云查看器（Three.js）</td><td>✅ 完成（v0.6.13 修复包围盒旋转后尺寸+放大模型）</td></tr>
+        <tr><td>Phase 4</td><td>测量工具 + 切断面</td><td>⏳ 待开发</td></tr>
+        <tr><td>Phase 5</td><td>桥洞轮廓自动生成</td><td>⏳ 待开发</td></tr>
+        <tr><td>Phase 6</td><td>对标报告（ECharts）</td><td>⏳ 待开发</td></tr>
+        <tr><td>Phase 7</td><td>AI 适配判定</td><td>⏳ 待开发</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- 模态框 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- 隐藏的导入文件输入 -->
+<input type="file" id="import-file-input" accept=".json" style="display:none">
+
+<!-- 内嵌 Console 脚本 -->
+<script type="text/plain" id="console-script-src">/* ============================================================
+   A2MAC1 CNSL — 浏览器 Console 提取脚本 v0.6.13
+   用法: 在 A2MAC1 3D Data v3 页面按 F12 → Console → 粘贴全部代码 → 回车
+
+   功能:
+   1. 自动提取车型名称、productId、nodeId
+   2. 自动提取尺寸数据（A/B/C 方向 + min 值）
+   3. 自动提取所有 3D 文件列表 + 下载链接
+   4. 一键导出 JSON，导入本地工具
+   ============================================================ */
+
+(async function () {
+  'use strict';
+
+  var BASE = 'https://ibp.a2mac1.com';
+  var HIERARCHY_ID = '00000005ZT4GEU01';
+
+  console.log('%c📐 A2MAC1 CNSL 数据提取器 v0.6.13', 'font-size:16px;color:#3b82f6;font-weight:bold');
+  console.log('%c正在自动提取所有数据...', 'color:#64748b');
+
+  function extractProductId() {
+    var urlParams = new URLSearchParams(location.search);
+    var pid = urlParams.get('productId');
+    if (pid) return pid;
+    var match = location.pathname.match(/products\/(A[A-Za-z0-9]+)/);
+    if (match) return match[1];
+    return null;
+  }
+
+  function extractNodeId() {
+    var entries = performance.getEntriesByType('resource');
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e.name.indexOf('/get-files') !== -1) {
+        var match = e.name.match(/hierarchy-node\/([A-Za-z0-9]+)/);
+        if (match) return match[1];
+      }
+    }
+    for (var j = 0; j < entries.length; j++) {
+      var ej = entries[j];
+      if (ej.name.indexOf('data-access') !== -1) {
+        var m = ej.name.match(/itemId=([A-Za-z0-9]+)/);
+        if (m) return m[1];
+      }
+    }
+    return null;
+  }
+
+  function extractVehicleName() {
+    var selectors = ['.product-title', '.product-name', '.vehicle-name', '[data-testid="product-title"]', 'h1', '.breadcrumb-item:last-child', '.page-title'];
+    for (var i = 0; i < selectors.length; i++) {
+      var el = document.querySelector(selectors[i]);
+      if (el && el.textContent && el.textContent.trim().length > 1) return el.textContent.trim();
+    }
+    if (document.title) {
+      var t = document.title.replace(/\s*[-|]\s*A2MAC1.*/, '').trim();
+      if (t) return t;
+    }
+    return null;
+  }
+
+  async function fetchFiles(productId, nodeId) {
+    var entries = performance.getEntriesByType('resource');
+    var getFilesUrl = null;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e.name.indexOf('/get-files') !== -1 && e.name.indexOf('api-version=2.0') !== -1) {
+        getFilesUrl = e.name;
+        break;
+      }
+    }
+    if (getFilesUrl) {
+      console.log('✅ 从缓存获取文件列表');
+      var res = await fetch(getFilesUrl, { credentials: 'include' });
+      var data = await res.json();
+      return Array.isArray(data) ? data : (data.files || []);
+    }
+    if (!productId) { console.error('❌ 未找到 productId'); return []; }
+    var nid = nodeId || '000000AUWL3CEU02';
+    var url = BASE + '/api/visual/files/hierarchy/' + HIERARCHY_ID + '/hierarchy-node/' + nid + '/get-files?api-version=2.0';
+    console.log('🔄 请求文件列表: ' + url);
+    var res2 = await fetch(url, { credentials: 'include' });
+    var data2 = await res2.json();
+    return Array.isArray(data2) ? data2 : (data2.files || []);
+  }
+
+  async function fetchDimensions(productId, nodeId) {
+    if (!productId || !nodeId) return null;
+    var dataUrl = BASE + '/api/products/' + productId + '/hierarchies/' + HIERARCHY_ID + '/nodes/' + nodeId + '/data';
+
+    // 先尝试 POST（opencli-plugin-a2mac1 使用的方式）
+    console.log('🔄 [POST] 请求尺寸数据: ' + dataUrl);
+    try {
+      var res = await fetch(dataUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: '{}'
+      });
+      if (res.ok) {
+        var json = await res.json();
+        console.log('✅ [POST] 尺寸数据获取成功');
+        return json;
+      }
+      console.warn('⚠️ [POST] 返回 ' + res.status + '，尝试 GET...');
+    } catch (e) { console.warn('⚠️ [POST] 失败: ' + e.message + '，尝试 GET...'); }
+
+    // 回退 GET
+    var getUrl = dataUrl + '?hideMappedProperties=false&hideMappedProductTypesProperties=true&hierarchyId=' + HIERARCHY_ID;
+    console.log('🔄 [GET] 请求尺寸数据: ' + getUrl);
+    try {
+      var res2 = await fetch(getUrl, { credentials: 'include' });
+      if (!res2.ok) throw new Error('HTTP ' + res2.status);
+      var text = await res2.text();
+      try { var json2 = JSON.parse(text); console.log('✅ [GET] 尺寸数据获取成功'); return json2; }
+      catch (e) { return { _raw: text, _note: '返回非 JSON' }; }
+    } catch (err) { console.warn('⚠️ [GET] 尺寸数据获取失败: ' + err.message); return null; }
+  }
+
+  function parseDimensions(rawData) {
+    if (!rawData) return [];
+    var items = [];
+    if (rawData.rows && Array.isArray(rawData.rows)) {
+      var props = (rawData.properties || []).map(function(p) { return p.name || p.label || ''; });
+      items = rawData.rows.map(function(row) {
+        var item = { name: row.name || row.label || '' };
+        if (row.cells && Array.isArray(row.cells)) {
+          for (var i = 0; i < props.length && i < row.cells.length; i++) { item[props[i]] = row.cells[i]; }
+        }
+        return item;
+      });
+    }
+    if (items.length === 0 && rawData.data && Array.isArray(rawData.data)) { items = rawData.data; }
+    if (items.length === 0 && Array.isArray(rawData)) { items = rawData; }
+    return items.map(function(item) {
+      return {
+        name: item.name || item.part || item.Part || item.label || '',
+        outerLength: item.A || item.outerLength || item.a || item.length || null,
+        outerWidth: item.B || item.outerWidth || item.b || item.width || null,
+        outerHeight: item.C || item.outerHeight || item.c || item.height || null,
+        lengthMin: item['A min'] || item.lengthMin || item.aMin || null,
+        widthMin: item['B min'] || item.widthMin || item.bMin || null,
+        heightMin: item['C min'] || item.heightMin || item.cMin || null,
+        material: item.Material || item.material || null,
+        mass: item.Mass || item.mass || null,
+        process: item.Process || item.process || null,
+        source: item.Source || item.source || null,
+        _raw: item
+      };
+    });
+  }
+
+  try {
+    var productId = extractProductId();
+    var nodeId = extractNodeId();
+    var vehicleName = extractVehicleName();
+
+    console.log('📋 productId: ' + (productId || '(未找到)'));
+    console.log('📋 nodeId: ' + (nodeId || '(未找到)'));
+    console.log('📋 车型名: ' + (vehicleName || '(未找到)'));
+
+    var files = await fetchFiles(productId, nodeId);
+    var dimensionsRaw = await fetchDimensions(productId, nodeId);
+    var dimensions = parseDimensions(dimensionsRaw);
+
+    console.log('\n%c══════════════════════════════════════', 'color:#3b82f6');
+    console.log('%c📊 提取结果汇总', 'font-size:16px;font-weight:bold;color:#22c55e');
+    console.log('%c══════════════════════════════════════', 'color:#3b82f6');
+    console.log('  车型: ' + (vehicleName || '未知'));
+    console.log('  文件数: ' + files.length + ' (' + files.filter(function(f) { return f.isDownloadable !== false; }).length + ' 个可下载)');
+    console.log('  尺寸条目: ' + dimensions.length);
+
+    if (dimensions.length > 0) {
+      console.log('\n%c📏 尺寸数据:', 'font-size:14px;font-weight:bold');
+      console.table(dimensions.slice(0, 20).map(function(d) {
+        return { name: d.name, A: d.outerLength, A_min: d.lengthMin, B: d.outerWidth, B_min: d.widthMin, C: d.outerHeight, C_min: d.heightMin, material: d.material };
+      }));
+    }
+
+    var downloadable = files.filter(function(f) { return f.isDownloadable !== false; });
+    var downloadLinks = downloadable.map(function(f) {
+      return {
+        id: f.id, name: f.name, partTypeId: f.partTypeId, partId: f.partId,
+        versionIds: f.versionIds || [], isTransparent: f.isTransparent || false, token: f.token,
+        downloadUrl: BASE + '/files/downloads/files?token=' + encodeURIComponent(f.token || '') + '&filename=' + encodeURIComponent(f.name || 'file') + '.zip&api-version=1.1'
+      };
+    });
+
+    window.__CNSL_DATA__ = {
+      exportedAt: new Date().toISOString(),
+      sourceUrl: location.href,
+      vehicle: { name: vehicleName || '', productId: productId || '', nodeId: nodeId || '', hierarchyId: HIERARCHY_ID },
+      dimensions: dimensions,
+      files: { total: files.length, downloadable: downloadable.length, items: downloadLinks }
+    };
+
+    console.log('\n%c🛠️ 命令:', 'font-size:14px;font-weight:bold');
+
+    window.__CNSL_exportJSON = function () {
+      var blob = new Blob([JSON.stringify(window.__CNSL_DATA__, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var name = (vehicleName || productId || 'export').replace(/[^a-zA-Z0-9一-鿿_-]/g, '_');
+      a.download = 'a2mac1-' + name + '-' + new Date().toISOString().slice(0, 10) + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      console.log('✅ JSON 文件已下载！');
+      console.log('💡 下一步：打开本地 CNSL 分析平台 → 数据库 → 导入此 JSON 文件');
+    };
+
+    window.__CNSL_copyLinks = function () {
+      var text = downloadLinks.map(function(f) { return f.downloadUrl; }).join('\n');
+      navigator.clipboard.writeText(text).then(function() { console.log('✅ 已复制 ' + downloadLinks.length + ' 个下载链接'); });
+    };
+
+    window.__CNSL_downloadAll = function (delayMs) {
+      delayMs = delayMs || 800;
+      if (downloadLinks.length === 0) { console.log('⚠️ 没有可下载的文件'); return; }
+      if (!confirm('即将下载 ' + downloadLinks.length + ' 个文件，继续？')) return;
+      var i = 0;
+      var interval = setInterval(function() {
+        if (i >= downloadLinks.length) { clearInterval(interval); console.log('✅ 全部触发完成'); return; }
+        window.open(downloadLinks[i].downloadUrl, '_blank');
+        i++;
+      }, delayMs);
+      console.log('🔄 开始下载，间隔 ' + delayMs + 'ms...');
+    };
+
+    console.log('  %c__CNSL_exportJSON()%c  → 下载完整 JSON（车型+尺寸+文件链接）', 'color:#f59e0b;font-weight:bold', 'color:#94a3b8');
+    console.log('  %c__CNSL_copyLinks()%c  → 复制所有下载链接', 'color:#f59e0b;font-weight:bold', 'color:#94a3b8');
+    console.log('  %c__CNSL_downloadAll()%c → 批量下载所有文件', 'color:#f59e0b;font-weight:bold', 'color:#94a3b8');
+    console.log('  %c__CNSL_DATA__%c        → 查看完整数据', 'color:#f59e0b;font-weight:bold', 'color:#94a3b8');
+
+    console.log('\n%c✅ 提取完成！运行 __CNSL_exportJSON() 下载 JSON，然后导入本地工具。', 'color:#22c55e;font-size:14px;font-weight:bold');
+
+  } catch (err) {
+    console.error('❌ 提取失败: ' + err.message);
+    console.error('请确认: 1. 已登录 A2MAC1  2. 已进入 3D Data v3 页面  3. 页面已完全加载');
+  }
+})();</script>
+
+<!-- ════════════════════════════════════════════════════════
+3D 查看器拖放处理 — 独立脚本，不依赖 Three.js 模块
+页面加载后立即生效，确保拖放事件始终被拦截
+════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+  var container = document.getElementById('viewer3d-container');
+  var canvas = document.getElementById('viewer3d-canvas');
+  var dropzone = document.getElementById('viewer3d-dropzone');
+  var fileInput = document.getElementById('viewer3d-file-input');
+  var hint = document.getElementById('viewer3d-hint');
+  var fileList = document.getElementById('viewer3d-file-list');
+
+  if (!container || !canvas) {
+    console.warn('[3D查看器] 容器或画布未找到，拖放处理器未初始化');
+    return;
+  }
+
+  console.log('[3D查看器] 原生拖放处理器已就绪');
+
+  // 待处理文件队列（3D 引擎就绪前暂存）
+  window.__viewer3d_pending = [];
+
+  function handleFiles(files) {
+    console.log('[3D查看器] 收到 ' + files.length + ' 个文件:', Array.from(files).map(function(f) { return f.name; }));
+    // 在侧边栏文件列表显示
+    if (fileList) {
+      fileList.innerHTML = '';
+      Array.from(files).forEach(function(f) {
+        fileList.innerHTML += '<div>📄 ' + f.name + ' (' + (f.size / 1024).toFixed(1) + ' KB)</div>';
+      });
+    }
+    // 隐藏提示
+    if (hint) hint.style.display = 'none';
+    // 如果有 3D 引擎，直接处理；否则入队
+    if (window.Viewer3D && window.Viewer3D.isReady && window.Viewer3D.isReady()) {
+      window.Viewer3D.handleFiles(files);
+    } else {
+      window.__viewer3d_pending = Array.from(files);
+      console.log('[3D查看器] 3D 引擎未就绪，文件已入队等待 (' + files.length + ' 个)');
+    }
+  }
+
+  // ═══ 画布拖放（关键！阻止浏览器默认"打开文件"行为） ═══
+  canvas.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (container) container.classList.add('drag-over');
+  });
+  canvas.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (container) container.classList.remove('drag-over');
+  });
+  canvas.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (container) container.classList.remove('drag-over');
+    console.log('[3D查看器] canvas drop 触发');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // ═══ 容器拖放（兜底） ═══
+  container.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    container.classList.add('drag-over');
+  });
+  container.addEventListener('dragleave', function(e) {
+    if (!container.contains(e.relatedTarget)) {
+      container.classList.remove('drag-over');
+    }
+  });
+  container.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    container.classList.remove('drag-over');
+    console.log('[3D查看器] container drop 触发');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // ═══ 侧边栏拖放区 ═══
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', function() { fileInput.click(); });
+    dropzone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropzone.classList.add('drag-over');
+    });
+    dropzone.addEventListener('dragleave', function() {
+      dropzone.classList.remove('drag-over');
+    });
+    dropzone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      console.log('[3D查看器] dropzone drop 触发');
+      handleFiles(e.dataTransfer.files);
+    });
+  }
+
+  // ═══ 文件选择输入 ═══
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files.length > 0) {
+        console.log('[3D查看器] 文件选择:', fileInput.files.length);
+        handleFiles(fileInput.files);
+        fileInput.value = '';
+      }
+    });
+  }
+
+  // ═══ 双击画布触发文件选择 ═══
+  canvas.addEventListener('dblclick', function() {
+    console.log('[3D查看器] 双击画布');
+    if (fileInput) fileInput.click();
+  });
+})();
+</script>
+
+<!-- JS -->
+<script src="js/db.js"></script>
+<script src="js/a2mac1-api.js"></script>
+<script src="js/app.js"></script>
+<script type="module" src="js/viewer3d.js"></script>
+</body>
+</html>

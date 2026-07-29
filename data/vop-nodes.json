@@ -1,0 +1,72 @@
+{
+  "version": "0.1.0",
+  "source": "opencli-plugin-a2mac1 / A2MAC1 VOP hierarchy",
+  "hierarchyId": "00000005ZT4GEU01",
+  "hierarchyName": "Vehicle Occupant Packaging",
+  "description": "VOP 层级树中已确认的节点 ID。这些 ID 跨车型通用，可直接用于 API 调用。",
+  "nodes": {
+    "3D Data v3": {
+      "id": "000000AUWL3CEU02",
+      "label": "3D Data v3",
+      "note": "3D 数据入口，所有车型的 get-files 都从此节点获取",
+      "children": {
+        "3D Files": {
+          "id": "000000AAS05BEU02",
+          "label": "3D Files",
+          "note": "轮廓图、人机、行李箱等 3D 文件",
+          "children": {
+            "Contour": { "id": null, "label": "Contour", "note": "外轮廓图" },
+            "Manikin": { "id": null, "label": "Manikin", "note": "人机布置" },
+            "Trunk": { "id": null, "label": "Trunk", "note": "行李箱" }
+          }
+        },
+        "Schematics": {
+          "id": "000000AFH8LREU02",
+          "label": "Schematics",
+          "note": "尺寸图/原理图",
+          "children": {
+            "Exterior Dimensions": {
+              "id": null,
+              "label": "Exterior Dimensions",
+              "note": "外部尺寸 — SAE J1100: Length, Height, Width, Angle",
+              "measures": ["Length", "Height", "Width", "Angle"]
+            },
+            "Interior Dimensions": {
+              "id": null,
+              "label": "Interior Dimensions",
+              "note": "内部尺寸 — SAE J1100: Length, Height, Width, Seats, Trunk",
+              "measures": ["Length", "Height", "Width", "Seats", "Trunk"]
+            },
+            "Manikin": {
+              "id": null,
+              "label": "Manikin",
+              "note": "人机坐姿测量"
+            },
+            "Surfaces": {
+              "id": null,
+              "label": "Surfaces",
+              "note": "车窗、雨刮、脚印等表面"
+            },
+            "Volumes": {
+              "id": null,
+              "label": "Volumes",
+              "note": "行李箱容积"
+            }
+          }
+        }
+      }
+    }
+  },
+  "quickReference": {
+    "00000005ZT4GEU01": "Vehicle Occupant Packaging (VOP) — 固定 hierarchyId",
+    "000000AUWL3CEU02": "3D Data v3 — 3D 数据入口 nodeId",
+    "000000AAS05BEU02": "3D Files — 3D 文件列表",
+    "000000AFH8LREU02": "Schematics — 尺寸图/原理图"
+  },
+  "apiEndpoints": {
+    "getFiles": "/api/visual/files/hierarchy/{hierarchyId}/hierarchy-node/{nodeId}/get-files?api-version=2.0",
+    "getNodeData": "POST /api/products/{productId}/hierarchies/{hierarchyId}/nodes/{nodeId}/data",
+    "getHierarchyNodes": "POST /api/hierarchies/{hierarchyId}",
+    "dataAccess": "/api/security/data-access/type/3?productId={productId}&itemId={itemId}"
+  }
+}
