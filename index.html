@@ -681,7 +681,11 @@
     return;
   }
 
-  console.log('[3D查看器] 原生拖放处理器已就绪');
+  console.log('[3D查看器] 原生拖放处理器已就绪', {
+    container: !!container, canvas: !!canvas,
+    dropzone: !!dropzone, fileInput: !!fileInput,
+    hint: !!hint, fileList: !!fileList
+  });
 
   // 全局拖放拦截
   document.addEventListener('dragenter', function(e) { console.log('[3D] dragenter', e.target.tagName); });
