@@ -766,7 +766,11 @@
 
   // ═══ 侧边栏拖放区 ═══
   if (dropzone && fileInput) {
-    dropzone.addEventListener('click', function() { console.log('[3D] dropzone clicked'); fileInput.click(); });
+    // 把fileInput做成可见按钮，用户直接点击
+    fileInput.style.cssText = 'display:block;margin:12px auto;padding:12px 24px;background:#ffa000;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;width:auto';
+    dropzone.appendChild(fileInput);
+    dropzone.addEventListener('click', function(e) { console.log('[3D] dropzone clicked'); });
+  }
     dropzone.addEventListener('dragover', function(e) {
       e.preventDefault();
       dropzone.classList.add('drag-over');
@@ -795,19 +799,7 @@
     console.log('[3D] fileInput listeners attached');
   }
 
-  // 备用方案：直接显示文件输入框
-  var fallbackInput = document.getElementById('viewer3d-file-input');
-  fallbackInput.style.display = 'block';
-  fallbackInput.style.visibility = 'visible';
-  fallbackInput.style.position = 'relative';
-  fallbackInput.style.zIndex = '99999';
-  fallbackInput.style.padding = '12px';
-  fallbackInput.style.margin = '10px 0';
-  // 把input移到dropzone里面确保可见
-  var dropzoneEl = document.getElementById('viewer3d-dropzone');
-  if (dropzoneEl && fallbackInput.parentNode !== dropzoneEl) {
-    dropzoneEl.appendChild(fallbackInput);
-  }
+  // 备用方案：直接把fileInput做成可见按钮
 
   // ═══ 双击画布触发文件选择 ═══
   canvas.addEventListener('dblclick', function() {
