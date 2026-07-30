@@ -698,18 +698,18 @@
     }
   }
 
-  // 文件输入change事件
-  if (fileInput) {
-    fileInput.addEventListener('change', function() {
-      if (fileInput.files.length > 0) { handleFiles(fileInput.files); fileInput.value = ''; }
-    });
-  }
-
-  // 侧边栏dropzone可见的file input
-  if (dropzone && fileInput) {
-    fileInput.style.cssText = 'display:block;margin:12px auto;padding:12px 24px;background:#ffa000;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;width:auto';
-    dropzone.appendChild(fileInput);
-  }
+  // 创建全新的可见文件输入
+  var newInput = document.createElement('input');
+  newInput.type = 'file';
+  newInput.accept = '.ply,.stl,.obj,.zip';
+  newInput.multiple = true;
+  newInput.style.cssText = 'display:block;margin:12px auto;padding:12px 24px;background:#ffa000;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;width:auto';
+  newInput.addEventListener('change', function() {
+    console.log('[3D] newInput change fired, files:', newInput.files.length);
+    if (newInput.files.length > 0) { handleFiles(newInput.files); newInput.value = ''; }
+  });
+  if (dropzone) { dropzone.appendChild(newInput); }
+  console.log('[3D] newInput created and appended to dropzone');
 
   // canvas拖放
   ['dragover','drop'].forEach(function(ev) {
