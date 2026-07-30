@@ -1,5 +1,5 @@
 /* ============================================================
-   A2MAC1 CNSL — 浏览器 Console 提取脚本 v0.6.13
+   A2MAC1 CNSL — 浏览器 Console 提取脚本 v0.6.14
    用法: 在 A2MAC1 3D Data v3 页面按 F12 → Console → 粘贴全部代码 → 回车
 
    功能:
@@ -15,7 +15,7 @@
   var BASE = 'https://ibp.a2mac1.com';
   var HIERARCHY_ID = '00000005ZT4GEU01';
 
-  console.log('%c📐 A2MAC1 CNSL 数据提取器 v0.6.13', 'font-size:16px;color:#3b82f6;font-weight:bold');
+  console.log('%c📐 A2MAC1 CNSL 数据提取器 v0.6.14', 'font-size:16px;color:#3b82f6;font-weight:bold');
   console.log('%c正在自动提取所有数据...', 'color:#64748b');
 
   // ═══════════════════ 1. 提取产品信息 ═══════════════════

@@ -516,6 +516,48 @@ tr:hover td { background: #f1f5f9; }
   pointer-events: none;
 }
 
+/* ── 部件列表 ── */
+.v3d-part-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.v3d-part-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+.v3d-part-item.highlighted {
+  background: rgba(255, 170, 0, 0.18) !important;
+}
+.v3d-part-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.v3d-part-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.v3d-part-eye {
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.v3d-part-eye:hover {
+  opacity: 1;
+}
+
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .page { padding: 16px; }

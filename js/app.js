@@ -1,5 +1,5 @@
 /* ============================================================
-   A2MAC1 CNSL — 主应用逻辑 v0.6.13
+   A2MAC1 CNSL — 主应用逻辑 v0.7.1
    ============================================================ */
 
 const App = (() => {
@@ -524,6 +524,11 @@ const App = (() => {
         toast('数据库已清空', 'success');
       }
     };
+  }
+
+  function bindDatabase() {
+    // 数据库页面的按钮事件在 renderDatabase() 中动态绑定
+    // 导入文件输入和空状态按钮在 bindImportButtons() 中绑定
   }
 
   function _navigateToVehicle(id) {

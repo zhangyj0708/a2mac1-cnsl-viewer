@@ -1,5 +1,5 @@
 /* ============================================================
-   A2MAC1 CNSL — 3D 点云查看器 v0.6.13
+   A2MAC1 CNSL — 3D 点云查看器 v0.7.1
    Three.js 渲染引擎，负责加载和显示 3D 模型
 
    v0.6.9 修复:
@@ -46,7 +46,7 @@ const Viewer3D = (() => {
   let boundingBoxGroup = null;
   let displayMode = 'solid';
   let colorMode = 'solidColor';
-  let bgMode = 'light';          // ★ 默认浅色背景
+  // 背景固定为浅色
   let isMeasuring = false;
   let measurePoints = [];
   let measureMarkers = [];
@@ -58,6 +58,24 @@ const Viewer3D = (() => {
   let initialized = false;
   let threeJsReady = false;
   let autoRotate = false;        // ★ 自动旋转
+
+  // ★ Feature 6-9: 部件高亮/隐藏、颜色区分、截屏、双击重置
+  let highlightedModel = null;      // 当前高亮的部件索引
+  let colorPartsEnabled = false;    // 颜色区分开关
+  const PART_COLORS = [
+    0xe07060, // coral red
+    0x60b870, // green
+    0xe0a840, // gold
+    0x6088d0, // blue
+    0xc060c0, // purple
+    0x50b0b0, // teal
+    0xd08050, // orange
+    0x80a050, // olive
+    0xb06080, // rose
+    0x50a0d0, // sky blue
+    0xa0a060, // khaki
+    0xd06090, // pink
+  ];
 
   // ── 初始化 Three.js 引擎 ──
   function init() {
@@ -148,6 +166,7 @@ const Viewer3D = (() => {
 
       bindUIButtons();
       bindFloatBar();
+      setupKeyboardShortcuts();
 
       resizeWithRetry(0);
 
@@ -200,17 +219,9 @@ const Viewer3D = (() => {
 
   function setBackground() {
     if (!scene) return;
-    if (bgMode === 'dark') {
-      scene.background = new THREE.Color(0x2a2a3e);
-      scene.fog = new THREE.Fog(0x2a2a3e, 100, 500);
-    } else {
-      scene.background = new THREE.Color(0xe8e8ec);
-      scene.fog = null;
-    }
-    var grid = scene.getObjectByName('grid');
-    if (grid) {
-      grid.material.color.set(bgMode === 'dark' ? 0x555577 : 0x999999);
-    }
+    // 固定浅色背景
+    scene.background = new THREE.Color(0xe8e8ec);
+    scene.fog = null;
   }
 
   function resize() {
@@ -251,16 +262,6 @@ const Viewer3D = (() => {
       });
     });
 
-    // 背景
-    document.querySelectorAll('#viewer3d-bg-group .viewer3d-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#viewer3d-bg-group .viewer3d-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        bgMode = btn.dataset.bg;
-        setBackground();
-      });
-    });
-
     // 缩放按钮
     var zoomInBtn = document.getElementById('viewer3d-zoom-in');
     var zoomOutBtn = document.getElementById('viewer3d-zoom-out');
@@ -294,6 +295,13 @@ const Viewer3D = (() => {
       });
     });
 
+    // ★ Feature 6-9: 截图、颜色区分
+    var screenshotBtn = document.getElementById('viewer3d-screenshot');
+    if (screenshotBtn) screenshotBtn.addEventListener('click', takeScreenshot);
+
+    var colorPartsBtn = document.getElementById('viewer3d-color-parts');
+    if (colorPartsBtn) colorPartsBtn.addEventListener('click', toggleColorParts);
+
     // 重置视角
     var resetBtn = document.getElementById('viewer3d-reset-camera');
     if (resetBtn) resetBtn.addEventListener('click', resetCamera);
@@ -313,6 +321,7 @@ const Viewer3D = (() => {
       'v3d-fbtn-top': function() { setPresetView('top'); },
       'v3d-fbtn-left': function() { setPresetView('left'); },
       'v3d-fbtn-iso': function() { setPresetView('iso'); },
+      'v3d-fbtn-screenshot': takeScreenshot,
     };
     Object.keys(bindings).forEach(function(id) {
       var btn = document.getElementById(id);
@@ -395,6 +404,179 @@ const Viewer3D = (() => {
       edgeLines[j].visible = show;
     }
     toast(show ? '边缘线：显示' : '边缘线：隐藏', 'info');
+  }
+
+  // ── ★ Feature 6: 部件高亮 ──
+  function highlightPart(index) {
+    if (highlightedModel === index) {
+      // 取消高亮
+      resetPartHighlight();
+      return;
+    }
+    resetPartHighlight();
+    highlightedModel = index;
+    var model = models[index];
+    if (!model) return;
+    // 保存原始材质属性
+    model.userData._origEmissive = model.material.emissive ? model.material.emissive.getHex() : 0;
+    model.userData._origEmissiveIntensity = model.material.emissiveIntensity || 0;
+    model.material.emissive = new THREE.Color(0xffaa00);
+    model.material.emissiveIntensity = 0.6;
+    model.material.needsUpdate = true;
+    updatePartsList();
+  }
+
+  function resetPartHighlight() {
+    if (highlightedModel !== null && models[highlightedModel]) {
+      var m = models[highlightedModel];
+      if (m.userData._origEmissive !== undefined) {
+        m.material.emissive = new THREE.Color(m.userData._origEmissive);
+        m.material.emissiveIntensity = m.userData._origEmissiveIntensity;
+      } else {
+        m.material.emissive = new THREE.Color(0x000000);
+        m.material.emissiveIntensity = 0;
+      }
+      m.material.needsUpdate = true;
+    }
+    highlightedModel = null;
+    updatePartsList();
+  }
+
+  // ── ★ Feature 6: 部件可见性切换 ──
+  function togglePartVisibility(index) {
+    var model = models[index];
+    if (!model) return;
+    model.visible = !model.visible;
+    // 同步边缘线可见性
+    if (edgeLines[index]) {
+      edgeLines[index].visible = model.visible;
+    }
+    updatePartsList();
+  }
+
+  // ── ★ Feature 7: 颜色区分 ──
+  function toggleColorParts() {
+    colorPartsEnabled = !colorPartsEnabled;
+    if (colorPartsEnabled) {
+      applyPartColors();
+    } else {
+      resetPartColors();
+    }
+    updatePartsList();
+    var btn = document.getElementById('viewer3d-color-parts');
+    if (btn) {
+      if (colorPartsEnabled) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    toast(colorPartsEnabled ? '颜色区分：开' : '颜色区分：关（纯色）', 'info');
+  }
+
+  function applyPartColors() {
+    for (var i = 0; i < models.length; i++) {
+      var color = PART_COLORS[i % PART_COLORS.length];
+      models[i].material.color.set(color);
+      models[i].material.needsUpdate = true;
+    }
+  }
+
+  function resetPartColors() {
+    for (var i = 0; i < models.length; i++) {
+      models[i].material.color.set(0x8899b0);
+      models[i].material.needsUpdate = true;
+    }
+  }
+
+  // ── ★ Feature 8: 截屏 ──
+  function takeScreenshot() {
+    if (!renderer) return;
+    try {
+      renderer.render(scene, camera);
+      var dataURL = renderer.domElement.toDataURL('image/png');
+      var link = document.createElement('a');
+      var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      link.download = 'a2mac1-3d-view-' + ts + '.png';
+      link.href = dataURL;
+      link.click();
+      toast('截屏已保存: ' + link.download, 'success');
+    } catch (e) {
+      console.error('[3D查看器] 截屏失败:', e);
+      toast('截屏失败: ' + e.message, 'error');
+    }
+  }
+
+  // ── ★ Feature 6-7: 部件列表面板 ──
+  function updatePartsList() {
+    var listEl = document.getElementById('viewer3d-parts-list');
+    if (!listEl) return;
+    if (models.length === 0) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:4px 0">未加载模型</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < models.length; i++) {
+      var name = models[i].userData.originalName || models[i].name || 'Part ' + (i + 1);
+      if (name.length > 20) name = name.slice(0, 18) + '..';
+      var isVisible = models[i].visible !== false;
+      var isHighlighted = highlightedModel === i;
+      var colorHex = colorPartsEnabled
+        ? '#' + PART_COLORS[i % PART_COLORS.length].toString(16).padStart(6, '0')
+        : '#8899b0';
+      html += '<div class="v3d-part-item' + (isHighlighted ? ' highlighted' : '') + '"'
+        + ' data-index="' + i + '"'
+        + ' style="' + (isHighlighted ? 'background:rgba(255,170,0,0.15);' : '') + '">'
+        + '<span class="v3d-part-color" style="background:' + colorHex + '"></span>'
+        + '<span class="v3d-part-name" style="' + (isVisible ? '' : 'opacity:0.35;text-decoration:line-through') + '">'
+        + name + '</span>'
+        + '<span class="v3d-part-eye" style="cursor:pointer" data-action="toggle" data-index="' + i + '">'
+        + (isVisible ? '👁️' : '🚫') + '</span>'
+        + '</div>';
+    }
+    listEl.innerHTML = html;
+
+    // 绑定点击事件
+    var items = listEl.querySelectorAll('.v3d-part-item');
+    for (var j = 0; j < items.length; j++) {
+      items[j].addEventListener('click', function(e) {
+        var idx = parseInt(this.dataset.index);
+        var target = e.target;
+        if (target.dataset.action === 'toggle') {
+          e.stopPropagation();
+          togglePartVisibility(idx);
+        } else {
+          highlightPart(idx);
+        }
+      });
+    }
+  }
+
+  // ── ★ Feature 9: 键盘快捷键 ──
+  function setupKeyboardShortcuts() {
+    if (!canvas) return;
+    canvas.setAttribute('tabindex', '0'); // 使 canvas 可聚焦
+    canvas.addEventListener('keydown', function(e) {
+      // 如果焦点在输入框内，不处理
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+      switch (e.key.toLowerCase()) {
+        case 'r': resetCamera(); toast('快捷键: 重置视角', 'info'); break;
+        case 'f': zoomFit(); toast('快捷键: 适配窗口', 'info'); break;
+        case 's': takeScreenshot(); break;
+        case 'a': toggleAutoRotate(); break;
+        case 'e': toggleEdgeLines(edgeLines.length > 0 ? !edgeLines[0].visible : true); break;
+        case 'c': toggleColorParts(); break;
+        case '1': setPresetView('front'); break;
+        case '2': setPresetView('back'); break;
+        case '3': setPresetView('left'); break;
+        case '4': setPresetView('right'); break;
+        case '5': setPresetView('top'); break;
+        case '6': setPresetView('bottom'); break;
+        case '7': setPresetView('iso'); break;
+        case 'escape': resetPartHighlight(); break;
+        default: return; // 不阻止其他按键
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    });
   }
 
   // ── 预设视角 ──
@@ -493,6 +675,8 @@ const Viewer3D = (() => {
       }
     }
     models = [];
+    highlightedModel = null;
+    colorPartsEnabled = false;
 
     // ★ 清除边缘线框
     for (var j = 0; j < edgeLines.length; j++) {
@@ -747,6 +931,9 @@ const Viewer3D = (() => {
     // 更新信息面板
     try { updateInfoPanel(size); console.log('[3D查看器] updateInfoPanel 已调用'); } catch (e) { console.error('[3D查看器] updateInfoPanel 失败:', e); }
 
+    // ★ 更新部件列表
+    try { updatePartsList(); } catch (e) { console.error('[3D查看器] updatePartsList 失败:', e); }
+
     console.log('[3D查看器] 模型组已居中，共 ' + models.length + ' 个部件');
     showFloatBar();
     toast('加载完成: ' + models.length + ' 个部件', 'success');
@@ -860,9 +1047,7 @@ const Viewer3D = (() => {
     var oldGrid = scene.getObjectByName('grid');
     if (oldGrid) scene.remove(oldGrid);
 
-    var newGrid = new THREE.GridHelper(gridSize, divisions,
-      bgMode === 'dark' ? 0x555577 : 0xaaaaaa,
-      bgMode === 'dark' ? 0x333344 : 0xdddddd);
+    var newGrid = new THREE.GridHelper(gridSize, divisions, 0xaaaaaa, 0xdddddd);
     newGrid.name = 'grid';
     // ★ 网格放到模型底部（世界空间包围盒的底部），不切穿模型
     newGrid.position.y = worldBox.min.y;
@@ -1010,8 +1195,9 @@ const Viewer3D = (() => {
           color: 0x3388ff, wireframe: true,
         });
       } else {
+        var baseColor = colorPartsEnabled ? PART_COLORS[i % PART_COLORS.length] : 0x8899b0;
         model.material = new THREE.MeshStandardMaterial({
-          color: 0x8899b0, roughness: 0.55, metalness: 0.05,
+          color: baseColor, roughness: 0.55, metalness: 0.05,
           side: THREE.DoubleSide, flatShading: false,
           vertexColors: colorMode !== 'solidColor',
         });
@@ -1037,11 +1223,21 @@ const Viewer3D = (() => {
   }
 
   function applyColorMode() {
+    // 切换到高度/法向着色时，自动关闭颜色区分
+    if (colorMode !== 'solidColor' && colorPartsEnabled) {
+      colorPartsEnabled = false;
+      var btn = document.getElementById('viewer3d-color-parts');
+      if (btn) btn.classList.remove('active');
+    }
     for (var i = 0; i < models.length; i++) {
       var model = models[i];
       if (colorMode === 'solidColor') {
         model.material.vertexColors = false;
-        model.material.color.set(0x8899b0);
+        if (colorPartsEnabled) {
+          model.material.color.set(PART_COLORS[i % PART_COLORS.length]);
+        } else {
+          model.material.color.set(0x8899b0);
+        }
       } else {
         applyVertexColors(model.geometry, colorMode);
         model.material.vertexColors = true;
