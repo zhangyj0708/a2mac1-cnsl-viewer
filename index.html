@@ -683,6 +683,16 @@
 
   console.log('[3D查看器] 原生拖放处理器已就绪');
 
+  // 全局拖放拦截（防止OrbitControls拦截drag事件）
+  document.addEventListener('dragover', function(e) { e.preventDefault(); });
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (e.target.closest('#viewer3d-container') || e.target.closest('.viewer3d-dropzone') || e.target.closest('.viewer3d-sidebar')) {
+      console.log('[3D查看器] 全局drop触发，文件:', e.dataTransfer.files.length);
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
   // 待处理文件队列（3D 引擎就绪前暂存）
   window.__viewer3d_pending = [];
 
