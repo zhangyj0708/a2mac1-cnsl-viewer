@@ -683,12 +683,19 @@
 
   console.log('[3D查看器] 原生拖放处理器已就绪');
 
-  // 全局拖放拦截（防止OrbitControls拦截drag事件）
-  document.addEventListener('dragenter', function(e) { console.log('[3D] dragenter', e.target.tagName, e.target.className.slice(0,30)); });
-  document.addEventListener('dragover', function(e) { e.preventDefault(); });
+  // 全局拖放拦截
+  document.addEventListener('dragenter', function(e) { console.log('[3D] dragenter', e.target.tagName); });
+  document.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); });
   document.addEventListener('drop', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    console.log('[3D] drop on', e.target.tagName, 'files:', e.dataTransfer.files.length);
+    handleFiles(e.dataTransfer.files);
+  });
+  // 也加到window上，确保兜底
+  window.addEventListener('dragover', function(e) { e.preventDefault(); });
+  window.addEventListener('drop', function(e) {
     e.preventDefault();
-    console.log('[3D] drop on', e.target.tagName, e.target.className.slice(0,30), 'files:', e.dataTransfer.files.length);
+    console.log('[3D] window drop files:', e.dataTransfer.files.length);
     handleFiles(e.dataTransfer.files);
   });
 
