@@ -697,18 +697,22 @@
     }
   }
 
-  // 简单文件选择 - 放到body上，避免被page-viewer3d的display:none影响
+  // 用label包装file input确保浏览器正确处理
+  var label = document.createElement('label');
+  label.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;display:inline-block;padding:20px 40px;background:#ffa000;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer';
+  label.textContent = '📂 选择文件';
   var fileInput = document.createElement('input');
   fileInput.type = 'file';
   fileInput.accept = '.ply,.stl,.obj,.zip';
   fileInput.multiple = true;
-  fileInput.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;display:block;padding:20px 40px;background:#ffa000;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer';
+  fileInput.style.cssText = 'display:none';
   fileInput.addEventListener('change', function() {
-    console.log('[3D] fileInput change!', fileInput.files.length);
+    console.log('[3D] change!', fileInput.files.length);
     if (fileInput.files.length > 0) { handleFiles(fileInput.files); fileInput.value = ''; }
   });
-  document.body.appendChild(fileInput);
-  console.log('[3D] fileInput on body, ready');
+  label.appendChild(fileInput);
+  document.body.appendChild(label);
+  console.log('[3D] label+input on body, ready');
 })();
 </script>
 
