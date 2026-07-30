@@ -795,6 +795,28 @@
     console.log('[3D] fileInput listeners attached');
   }
 
+  // 备用方案：创建一个独立于Three.js的文件输入
+  var fallbackInput = document.createElement('input');
+  fallbackInput.type = 'file';
+  fallbackInput.accept = '.ply,.stl,.obj,.zip';
+  fallbackInput.multiple = true;
+  fallbackInput.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;padding:10px 20px;background:#ffa000;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;display:none';
+  fallbackInput.textContent = '📂 选择文件';
+  document.body.appendChild(fallbackInput);
+  fallbackInput.addEventListener('change', function() {
+    console.log('[3D] fallbackInput change, files:', fallbackInput.files.length);
+    if (fallbackInput.files.length > 0) {
+      handleFiles(fallbackInput.files);
+      fallbackInput.value = '';
+    }
+  });
+  // 用按钮触发备用的input
+  var fallbackBtn = document.createElement('button');
+  fallbackBtn.textContent = '📂 选择文件';
+  fallbackBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;padding:12px 24px;background:#ffa000;color:white;border:none;border-radius:9px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 2px 10px rgba(0,0,0,0.3)';
+  fallbackBtn.onclick = function() { fallbackInput.click(); };
+  document.body.appendChild(fallbackBtn);
+
   // ═══ 双击画布触发文件选择 ═══
   canvas.addEventListener('dblclick', function() {
     console.log('[3D查看器] 双击画布');
