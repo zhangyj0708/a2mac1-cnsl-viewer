@@ -786,5 +786,18 @@
 <script src="js/a2mac1-api.js"></script>
 <script src="js/app.js"></script>
 <script type="module" src="js/viewer3d.js"></script>
+<script type="module">
+import * as THREE from 'three';
+console.log('[3D] Three.js loaded, ver:', THREE.REVISION);
+</script>
+<script>
+setTimeout(function() {
+  if (!window.Viewer3D) {
+    console.error('[3D] Viewer3D failed to load');
+    var hint = document.getElementById('viewer3d-hint');
+    if (hint) hint.innerHTML = '<div class="icon">❌</div><p>3D引擎加载失败</p><p style="font-size:12px">请刷新重试</p>';
+  }
+}, 5000);
+</script>
 </body>
 </html>
